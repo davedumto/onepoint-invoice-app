@@ -11,12 +11,13 @@ import {
 
 export const runtime = "nodejs";
 
-PDFParse.setWorker(
-  path.join(process.cwd(), "node_modules/pdf-parse/dist/pdf-parse/cjs/pdf.worker.mjs")
-);
-
 export async function POST(request: Request) {
   try {
+    // Set the worker inside the handler so any path error is caught here
+    // rather than killing the module at load time.
+    PDFParse.setWorker(
+      path.join(process.cwd(), "node_modules/pdf-parse/dist/pdf-parse/cjs/pdf.worker.mjs")
+    );
     const formData = await request.formData();
     const file = formData.get("file");
     const markupValue = Number(formData.get("markupPercent") ?? "0");
