@@ -1,7 +1,11 @@
-import path from "node:path";
-
 import { NextResponse } from "next/server";
-import { PDFParse } from "pdf-parse";
+
+// Import from the lib path directly — pdf-parse v1's index.js reads a test
+// fixture at require-time which crashes in serverless. The lib entry has no
+// such side-effect. We also stay on v1 to avoid the pdfjs-dist DOMMatrix /
+// @napi-rs/canvas dependency that pdf-parse v2 requires in Node.js runtimes.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse: (buf: Buffer) => Promise<{ text: string }> = require("pdf-parse/lib/pdf-parse.js");
 
 import {
   buildBrandedQuotePdf,
@@ -13,11 +17,6 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    // Set the worker inside the handler so any path error is caught here
-    // rather than killing the module at load time.
-    PDFParse.setWorker(
-      path.join(process.cwd(), "node_modules/pdf-parse/dist/pdf-parse/cjs/pdf.worker.mjs")
-    );
     const formData = await request.formData();
     const file = formData.get("file");
     const markupValue = Number(formData.get("markupPercent") ?? "0");
@@ -44,9 +43,7 @@ export async function POST(request: Request) {
     }
 
     const pdfBuffer = Buffer.from(await file.arrayBuffer());
-    const parser = new PDFParse({ data: pdfBuffer });
-    const parsed = await parser.getText();
-    await parser.destroy();
+    const parsed = await pdfParse(pdfBuffer);
 
     const extracted = extractQuoteDetails(parsed.text ?? "");
     const brandedPdf = await buildBrandedQuotePdf({
